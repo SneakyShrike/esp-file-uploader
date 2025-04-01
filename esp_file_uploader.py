@@ -60,9 +60,9 @@ def get_mklittlefs_binary():
                     filename = asset['name']
                     break
         except KeyError as e:
-            print(e,'\n')
+            print('Error: The following JSON keys were not found from the request:', e,'\n')
             exit(1)
-
+            
         try:
             # download the file with a get request
             file_response = requests.get(download_url)
