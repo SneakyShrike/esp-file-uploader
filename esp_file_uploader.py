@@ -6,10 +6,11 @@ import tarfile
 from zipfile import ZipFile 
 
 # vars for generating littlefs binary
+EXTENSIONS = ['.bin', '.exe', '']
 OS_PLATFORM = sys.platform
-MKLITTLEFS_BIN_DIR = './mklittlefs'
-FILE_DATA_FOLDER = './data'
-LITTLEFS_BIN = ''
+MKLITTLEFS_BIN_PATH = None
+DATA_FILE = file = next((file for file in os.listdir("./data") if os.path.isfile(f"./data/{file}")), None)
+LITTLEFS_BIN_PATH = './littlefs.bin'
 
 # vars for uploading file to esp
 PORT = []
@@ -17,13 +18,15 @@ BAUD_RATE = '115200'
 FLASH_ADDRESS = ''
 
 def get_mklittlefs_binary():
+
+    global MKLITTLEFS_BIN_PATH
     api_url = 'https://api.github.com/repos/earlephilhower/mklittlefs/releases/latest'
     platform_str = None
     download_url = None
     filename = None
 
-    # check if mklittlefs binary or exe exists in current dir
-    if any(os.path.isfile(f'{MKLITTLEFS_BIN_DIR}/mklittlefs{ext}') for ext in ['.bin', '.exe', '']):
+    # check if mklittlefs binary or exe exists in mklittlfs folder
+    if any(os.path.isfile(f'mklittlefs/mklittlefs{ext}') for ext in EXTENSIONS):
         print('mklittlefs binary already present\n') 
         
     else:
@@ -102,17 +105,34 @@ def get_mklittlefs_binary():
 
         # remove the zip / tar.gz archive
         os.remove(filename)
+    
+    MKLITTLEFS_BIN_PATH = next((f'./mklittlefs/mklittlefs{ext}' for ext in EXTENSIONS if os.path.exists(f'./mklittlefs/mklittlefs{ext}')), None)
 
-        
+def make_littlefs_binary():
+    print('Creating',LITTLEFS_BIN_PATH,'...\n')
+    try:
+        # TODO
+        cmd = [MKLITTLEFS_BIN_PATH, "-c", DATA_FILE, "-p", "256", "-b", "8192", "-s", "2072576", LITTLEFS_BIN_PATH]
+        subprocess.run(cmd, capture_output=True, text=True)
+        print('Succesfully created:', LITTLEFS_BIN_PATH, 'with', DATA_FILE, 'data\n')
+    
+    except subprocess.CalledProcessError as e:
+        print(f"Error: mklittlefs failed with exit code {e.returncode}",'\n')
+        # print("Output:\n", e.stderr if e.stderr else e.stdout)
 
-  
-            
+    except FileNotFoundError:
+        print(f"Error: mklittlefs binary not found at {MKLITTLEFS_BIN_PATH}",'\n')
+
+    except PermissionError:
+        print(f"Error: Permission denied when executing {MKLITTLEFS_BIN_PATH}",'\n')
+
+# def upload_file_to_esp():
+
 
 print('\nDetected OS:', OS_PLATFORM, '\n')
 
+print(MKLITTLEFS_BIN_PATH)
+
 get_mklittlefs_binary()
-
-
-# def make_littlefs_binary(os):
-
-# def upload_file_to_esp():
+print(MKLITTLEFS_BIN_PATH)
+make_littlefs_binary()
