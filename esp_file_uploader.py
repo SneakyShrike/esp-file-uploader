@@ -13,7 +13,7 @@ DATA_FILE = file = next((file for file in os.listdir("./data") if os.path.isfile
 LITTLEFS_BIN_PATH = './littlefs.bin'
 
 # vars for uploading file to esp
-PORT = []
+ESP_ARRAY = []
 BAUD_RATE = '115200'
 FLASH_ADDRESS = ''
 
@@ -111,7 +111,6 @@ def get_mklittlefs_binary():
 def make_littlefs_binary():
     print('Creating',LITTLEFS_BIN_PATH,'...\n')
     try:
-        # TODO
         cmd = [MKLITTLEFS_BIN_PATH, "-c", DATA_FILE, "-p", "256", "-b", "8192", "-s", "2072576", LITTLEFS_BIN_PATH]
         subprocess.run(cmd, capture_output=True, text=True)
         print('Succesfully created:', LITTLEFS_BIN_PATH, 'with', DATA_FILE, 'data\n')
@@ -128,11 +127,26 @@ def make_littlefs_binary():
 
 # def upload_file_to_esp():
 
+def pop_esp_array():
+    os_esp_format = ''
+    if OS_PLATFORM == 'darwin':
+        os_esp_format = 'tty.usbserial'
+    if OS_PLATFORM == 'linux':
+        os_esp_format = 'ttyUSB'
+    # TODO add windows option
+
+    for esp in os.listdir('/dev'):
+        if esp.startswith(os_esp_format):
+            ESP_ARRAY.append(esp)
+    # if OS_PLATFORM == 'darwin' or OS_PLATFORM == 'linux':
+
+
+
 
 print('\nDetected OS:', OS_PLATFORM, '\n')
 
-print(MKLITTLEFS_BIN_PATH)
 
-get_mklittlefs_binary()
-print(MKLITTLEFS_BIN_PATH)
-make_littlefs_binary()
+# get_mklittlefs_binary()
+# make_littlefs_binary()
+pop_esp_array()
+print(ESP_ARRAY)

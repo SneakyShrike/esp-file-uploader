@@ -1,3 +1,4 @@
 *.txt
 *.bin
 /mklittlefs/
+.DS_Store
