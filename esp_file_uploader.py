@@ -14,8 +14,8 @@ LITTLEFS_BIN_PATH = './littlefs.bin'
 
 # vars for uploading file to esp
 ESP_ARRAY = []
+CHIP = 'esp8266'
 BAUD_RATE = '115200'
-FLASH_ADDRESS = ''
 
 def get_mklittlefs_binary():
 
@@ -125,8 +125,6 @@ def make_littlefs_binary():
     except PermissionError:
         print(f"Error: Permission denied when executing {MKLITTLEFS_BIN_PATH}",'\n')
 
-# def upload_file_to_esp():
-
 def pop_esp_array():
     os_esp_format = ''
     if OS_PLATFORM == 'darwin':
@@ -138,15 +136,17 @@ def pop_esp_array():
     for esp in os.listdir('/dev'):
         if esp.startswith(os_esp_format):
             ESP_ARRAY.append(esp)
-    # if OS_PLATFORM == 'darwin' or OS_PLATFORM == 'linux':
 
-
-
-
+def upload_file_to_esp():
+    print('Uploading LittleFS filesystem with', DATA_FILE,'...\n')
+    for esp in ESP_ARRAY:
+        cmd = ['esptool.py', '--port', f'/dev/{esp}', '--baud', BAUD_RATE, 'write_flash', '0x200000', LITTLEFS_BIN_PATH]
+        subprocess.run(cmd)
+ 
 print('\nDetected OS:', OS_PLATFORM, '\n')
 
-
-# get_mklittlefs_binary()
-# make_littlefs_binary()
 pop_esp_array()
 print(ESP_ARRAY)
+get_mklittlefs_binary()
+make_littlefs_binary()
+upload_file_to_esp()
