@@ -9,25 +9,25 @@ from zipfile import ZipFile
 EXTENSIONS = ['.bin', '.exe', '']
 OS_PLATFORM = sys.platform
 MKLITTLEFS_BIN_PATH = None
-DATA_FILE = file = next((file for file in os.listdir("./data") if os.path.isfile(f"./data/{file}")), None)
-LITTLEFS_BIN_PATH = './littlefs.bin'
+DATA_FILE = file = next((file for file in os.listdir("data/") if os.path.isfile(f"data/{file}")), None) # checks that a file is present in the data folder
+LITTLEFS_BIN_PATH = 'littlefs.bin'
 
 # vars for uploading file to esp
-ESP_ARRAY = []
+ESP_ARRAY = [] # each plugged in esp name will be stored in an array
 CHIP = 'esp8266'
 BAUD_RATE = '115200'
 
 def get_mklittlefs_binary():
 
     global MKLITTLEFS_BIN_PATH
-    api_url = 'https://api.github.com/repos/earlephilhower/mklittlefs/releases/latest'
+    api_url = 'https://api.github.com/repos/earlephilhower/mklittlefs/releases/tags/2.5.1-1' # the mklittlefs binary must be 2.5.1-1 because the deauther board core is on an earlier verison of Ardunio core
     platform_str = None
     download_url = None
     filename = None
 
     # check if mklittlefs binary or exe exists in mklittlfs folder
     if any(os.path.isfile(f'mklittlefs/mklittlefs{ext}') for ext in EXTENSIONS):
-        print('mklittlefs binary already present\n') 
+        print('mklittlefs binary already present...\n') 
         
     else:
         print('Downloading mklittlefs...\n')
@@ -81,7 +81,7 @@ def get_mklittlefs_binary():
                 compressed_file.write(file_response.content)
             compressed_file.close()
 
-            print('Succesfully downloaded ', filename,'\n')
+            print('Succesfully downloaded', filename,'\n')
 
         except IOError as e:
             print(e,'\n')
@@ -98,7 +98,7 @@ def get_mklittlefs_binary():
                 file.extractall(filter='data')
                 file.close()
 
-            print('Succesfully uncompressed ', filename,'\n')
+            print('Succesfully uncompressed', filename,'\n')
         
         except (tarfile.TarError, zipfile.BadZipFile) as e:
             print(e)
@@ -106,13 +106,13 @@ def get_mklittlefs_binary():
         # remove the zip / tar.gz archive
         os.remove(filename)
     
-    MKLITTLEFS_BIN_PATH = next((f'./mklittlefs/mklittlefs{ext}' for ext in EXTENSIONS if os.path.exists(f'./mklittlefs/mklittlefs{ext}')), None)
+    MKLITTLEFS_BIN_PATH = next((f'mklittlefs/mklittlefs{ext}' for ext in EXTENSIONS if os.path.exists(f'mklittlefs/mklittlefs{ext}')), None)
 
 def make_littlefs_binary():
     print('Creating',LITTLEFS_BIN_PATH,'...\n')
     try:
-        cmd = [MKLITTLEFS_BIN_PATH, "-c", DATA_FILE, "-p", "256", "-b", "8192", "-s", "2072576", LITTLEFS_BIN_PATH]
-        subprocess.run(cmd, capture_output=True, text=True)
+        cmd = [MKLITTLEFS_BIN_PATH, "-c", 'data/', "-p", "256", "-b", "8192", "-s", "2072576", LITTLEFS_BIN_PATH]
+        subprocess.run(cmd, capture_output=True, text=True) # run the above command to create the littlefs filesystem with the text file data
         print('Succesfully created:', LITTLEFS_BIN_PATH, 'with', DATA_FILE, 'data\n')
     
     except subprocess.CalledProcessError as e:
@@ -126,6 +126,7 @@ def make_littlefs_binary():
         print(f"Error: Permission denied when executing {MKLITTLEFS_BIN_PATH}",'\n')
 
 def pop_esp_array():
+    # determine esp name format as this is different among operating systems
     os_esp_format = ''
     if OS_PLATFORM == 'darwin':
         os_esp_format = 'tty.usbserial'
@@ -133,17 +134,19 @@ def pop_esp_array():
         os_esp_format = 'ttyUSB'
     # TODO add windows option
 
+    # on mac and linux loop through /dev dir and add found esps to the array
     for esp in os.listdir('/dev'):
         if esp.startswith(os_esp_format):
             ESP_ARRAY.append(esp)
 
 def upload_file_to_esp():
     print('Uploading LittleFS filesystem with', DATA_FILE,'...\n')
+    # loop through the esp array and for each esp
     for esp in ESP_ARRAY:
-        cmd = ['esptool.py', '--port', f'/dev/{esp}', '--baud', BAUD_RATE, 'write_flash', '0x200000', LITTLEFS_BIN_PATH]
-        subprocess.run(cmd)
+        cmd = ['esptool.py', '--chip', CHIP, '--port', f'/dev/{esp}', '--baud', BAUD_RATE, 'write_flash', '2097152', LITTLEFS_BIN_PATH]
+        subprocess.run(cmd) # run the above command to upload the littlefs filesystem with the text data to the current esp in the array
  
-print('\nDetected OS:', OS_PLATFORM, '\n')
+print('\nDetected OS:',OS_PLATFORM, '\n')
 
 pop_esp_array()
 print(ESP_ARRAY)
