@@ -9,7 +9,8 @@ from zipfile import ZipFile
 EXTENSIONS = ['.bin', '.exe', '']
 OS_PLATFORM = sys.platform
 MKLITTLEFS_BIN_PATH = None
-DATA_FILE = file = next((file for file in os.listdir("data/") if os.path.isfile(f"data/{file}")), None) # checks that a file is present in the data folder
+# DATA_FILE = file = next((file for file in os.listdir("./data/") if os.path.isfile(f"./data/{file}")), None) # checks that a file is present in the data folder
+DATA_FOLDER = 'data/'
 LITTLEFS_BIN_PATH = 'littlefs.bin'
 
 # vars for uploading file to esp
@@ -111,9 +112,9 @@ def get_mklittlefs_binary():
 def make_littlefs_binary():
     print('Creating',LITTLEFS_BIN_PATH,'...\n')
     try:
-        cmd = [MKLITTLEFS_BIN_PATH, "-c", 'data/', "-p", "256", "-b", "8192", "-s", "2072576", LITTLEFS_BIN_PATH]
+        cmd = [MKLITTLEFS_BIN_PATH, "-c", DATA_FOLDER, "-p", "256", "-b", "8192", "-s", "2072576", LITTLEFS_BIN_PATH]
         subprocess.run(cmd, capture_output=True, text=True) # run the above command to create the littlefs filesystem with the text file data
-        print('Succesfully created:', LITTLEFS_BIN_PATH, 'with', DATA_FILE, 'data\n')
+        print('Succesfully created:', LITTLEFS_BIN_PATH, 'with', DATA_FOLDER, 'data\n')
     
     except subprocess.CalledProcessError as e:
         print(f"Error: mklittlefs failed with exit code {e.returncode}",'\n')
@@ -140,7 +141,7 @@ def pop_esp_array():
             ESP_ARRAY.append(esp)
 
 def upload_file_to_esp():
-    print('Uploading LittleFS filesystem with', DATA_FILE,'...\n')
+    print('Uploading LittleFS filesystem with', DATA_FOLDER,'...\n')
     # loop through the esp array and for each esp
     for esp in ESP_ARRAY:
         cmd = ['esptool.py', '--chip', CHIP, '--port', f'/dev/{esp}', '--baud', BAUD_RATE, 'write_flash', '2097152', LITTLEFS_BIN_PATH]
