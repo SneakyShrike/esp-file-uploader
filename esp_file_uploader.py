@@ -140,17 +140,41 @@ def pop_esp_array():
         if esp.startswith(os_esp_format):
             ESP_ARRAY.append(esp)
 
+def check_data_file():
+
+    text_files = ['macs.txt', 'deauth_settings.txt']
+
+    # check if DATA_DIRECTORY exists
+    if not os.path.isdir(DATA_FOLDER):
+        print(f'{DATA_FOLDER} folder not found, please create this directory...\n')
+        exit(1)
+
+    visible_files = [file for file in os.listdir(DATA_FOLDER) if not file.startswith('.') and os.path.isfile(os.path.join(DATA_FOLDER, file))]
+
+    if len(visible_files) != 1:
+        print(f'{DATA_FOLDER} folder is either empty or contains more than 1 file...\n')
+        exit(1)
+
+    file = visible_files[0]
+    if file not in text_files:
+        print(f'{DATA_FOLDER} folder should only contain ONE of the following: {text_files}\n')
+        exit(1)
+    
+    print(f'{file} found in {DATA_FOLDER} folder...\n')
+
 def upload_file_to_esp():
-    print('Uploading LittleFS filesystem with', DATA_FOLDER,'...\n')
     # loop through the esp array and for each esp
     for esp in ESP_ARRAY:
+        print(f'\nUploading  data to ESP: {esp}...\n')
         cmd = ['esptool.py', '--chip', CHIP, '--port', f'/dev/{esp}', '--baud', BAUD_RATE, 'write_flash', '2097152', LITTLEFS_BIN_PATH]
         subprocess.run(cmd) # run the above command to upload the littlefs filesystem with the text data to the current esp in the array
  
 print('\nDetected OS:',OS_PLATFORM, '\n')
 
-pop_esp_array()
-print(ESP_ARRAY)
-get_mklittlefs_binary()
-make_littlefs_binary()
-upload_file_to_esp()
+check_data_file()
+
+# pop_esp_array()
+# print(ESP_ARRAY)
+# get_mklittlefs_binary()
+# make_littlefs_binary()
+# upload_file_to_esp()
