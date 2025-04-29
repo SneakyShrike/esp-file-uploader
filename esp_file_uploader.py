@@ -11,12 +11,11 @@ EXTENSIONS = ['.bin', '.exe', '']
 OS_PLATFORM = sys.platform
 MKLITTLEFS_BIN_PATH = None
 DATA_FOLDER = 'data/'
-DATA_FOLDER_FILE = os.listdir(DATA_FOLDER)
+DATA_FOLDER_FILES = os.listdir(DATA_FOLDER)
 LITTLEFS_BIN_PATH = 'littlefs.bin'
 
 # vars for uploading file to esp
 ESP_ARRAY = [] # each plugged in esp name will be stored in an array
-
 CHIP = 'esp8266'
 BAUD_RATE = '115200'
 
@@ -29,7 +28,7 @@ def check_data_file():
         print(f'\n{DATA_FOLDER} folder not found, please create this directory...')
         exit(1)
 
-    visible_files = [file for file in DATA_FOLDER_FILE if not file.startswith('.') and os.path.isfile(os.path.join(DATA_FOLDER, file))]
+    visible_files = [file for file in DATA_FOLDER_FILES if not file.startswith('.') and os.path.isfile(os.path.join(DATA_FOLDER, file))]
 
     if len(visible_files) != 1:
         print(f'\n{DATA_FOLDER} folder is either empty or contains more than 1 file...')
@@ -41,6 +40,22 @@ def check_data_file():
         exit(1)
     
     print(f'\n{file} found in {DATA_FOLDER} folder...')
+
+def upload_options():
+
+    while True:
+        user_choice = input('\nChoose an ESP project to upload to: \n1: DEAUTHER\n2: CAM-DETECTOR\n:')
+        global ESP_TYPE
+
+        if user_choice != '1' or user_choice != '2':
+            print('Error: Invalid Option! Please choose 1 or 2!')
+            continue
+        if user_choice == '1':
+            ESP_TYPE = 'DEAUTHER'
+            break
+        elif user_choice == '2':
+            ESP_TYPE = 'CAM-DETECTOR'
+            break
 
 def get_mklittlefs_binary():
 
@@ -138,7 +153,7 @@ def make_littlefs_binary():
     try:
         cmd = [MKLITTLEFS_BIN_PATH, "-c", DATA_FOLDER, "-p", "256", "-b", "8192", "-s", "2072576", LITTLEFS_BIN_PATH]
         subprocess.run(cmd, capture_output=True, text=True) # run the above command to create the littlefs filesystem with the text file data
-        print(f'\nSuccesfully created: {LITTLEFS_BIN_PATH} with {DATA_FOLDER_FILE[0]}')
+        print(f'\nSuccesfully created: {LITTLEFS_BIN_PATH} with {DATA_FOLDER_FILES[0]}')
     
     except subprocess.CalledProcessError as e:
         print(f'\nError: mklittlefs failed with exit code {e.returncode}')
@@ -170,25 +185,43 @@ def change_file_channel(channel):
     file_lines[0] = re.sub(r'\d+', channel, file_lines[0], count=1)
     # write all lines including the changed channel line back to the file
     open(f'{DATA_FOLDER}deauth_settings.txt', 'w').writelines(file_lines)
-
+    print(f'\nChanged {DATA_FOLDER_FILES[0]} channel to {channel}')
+    
 def upload_file_to_esp():
-    channel_array = [1,2,3,4,5,6,7,8,9,10,11,12] 
-    index = 0
-    current_channel = str(channel_array[index])
+    # if the esp array is empty
+    while True:
+        if not ESP_ARRAY:
+            print('\nNo ESP boards were detected, check you have plugged in your desired boards...')
+            continue
+        break
+
+    #  if we're uploading files to a deauther ESP
+    if DATA_FOLDER_FILES[0] == 'deauth_settings.txt':
+    # if ESP_TYPE == 'DEAUTHER':
+        # populate channel array to match how many ESP boards are plugged in
+        channel_array = list(range(1,len(ESP_ARRAY)+1))
+        index = 0
+        current_channel = str(channel_array[index])
+        print(channel_array)
     # loop through the esp array and for each esp
     for esp in ESP_ARRAY:
         # if files are being uploaded to the deauther
-        # change the files channel starting at index 0 of the channel_array
-        change_file_channel(current_channel)
-        print(f'\nUploading {DATA_FOLDER_FILE[0]} to ESP: {esp} on channel {current_channel}...\n')
+        if DATA_FOLDER_FILES[0] == 'deauth_settings.txt':
+        # if ESP_TYPE == 'DEAUTHER':
+            # change the files channel starting at index 0 of the channel_array
+            change_file_channel(current_channel)
+            # increment index so next channel is added to next esp file upload in loop
+            index = index+1
+            print(index)
+        print(f'\nUploading {DATA_FOLDER_FILES[0]} to ESP: {esp}')
         cmd = ['esptool.py', '--chip', CHIP, '--port', f'/dev/{esp}', '--baud', BAUD_RATE, 'write_flash', '2097152', LITTLEFS_BIN_PATH]
         subprocess.run(cmd) # run the above command to upload the littlefs filesystem with the text data to the current esp in the array
-        # increment index so next channel is added to next esp file upload in loop
-        index+=1
-
-print('\nDetected OS:', OS_PLATFORM, '\n')
+      
+print(f'\nDetected OS: {OS_PLATFORM}')
+print(f'\nPlease plug in your ESP boards...')
 
 check_data_file()
+# upload_options()
 pop_esp_array()
 get_mklittlefs_binary()
 make_littlefs_binary()
