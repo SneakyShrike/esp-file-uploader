@@ -1,6 +1,7 @@
 import subprocess
 import sys
 import os
+import re
 import requests
 import tarfile
 from zipfile import ZipFile 
@@ -9,14 +10,37 @@ from zipfile import ZipFile
 EXTENSIONS = ['.bin', '.exe', '']
 OS_PLATFORM = sys.platform
 MKLITTLEFS_BIN_PATH = None
-# DATA_FILE = file = next((file for file in os.listdir("./data/") if os.path.isfile(f"./data/{file}")), None) # checks that a file is present in the data folder
 DATA_FOLDER = 'data/'
+DATA_FOLDER_FILE = os.listdir(DATA_FOLDER)
 LITTLEFS_BIN_PATH = 'littlefs.bin'
 
 # vars for uploading file to esp
 ESP_ARRAY = [] # each plugged in esp name will be stored in an array
+
 CHIP = 'esp8266'
 BAUD_RATE = '115200'
+
+def check_data_file():
+
+    text_files = ['macs.txt', 'deauth_settings.txt']
+
+    # check if DATA_DIRECTORY exists
+    if not os.path.isdir(DATA_FOLDER):
+        print(f'\n{DATA_FOLDER} folder not found, please create this directory...')
+        exit(1)
+
+    visible_files = [file for file in DATA_FOLDER_FILE if not file.startswith('.') and os.path.isfile(os.path.join(DATA_FOLDER, file))]
+
+    if len(visible_files) != 1:
+        print(f'\n{DATA_FOLDER} folder is either empty or contains more than 1 file...')
+        exit(1)
+
+    file = visible_files[0]
+    if file not in text_files:
+        print(f'\n{DATA_FOLDER} folder should only contain ONE of the following: {text_files}')
+        exit(1)
+    
+    print(f'\n{file} found in {DATA_FOLDER} folder...')
 
 def get_mklittlefs_binary():
 
@@ -28,10 +52,10 @@ def get_mklittlefs_binary():
 
     # check if mklittlefs binary or exe exists in mklittlfs folder
     if any(os.path.isfile(f'mklittlefs/mklittlefs{ext}') for ext in EXTENSIONS):
-        print('mklittlefs binary already present...\n') 
+        print('\nmklittlefs binary already present...') 
         
     else:
-        print('Downloading mklittlefs...\n')
+        print('\nDownloading mklittlefs...')
 
         try:
             # fetch api url for the latest mklittlefs binary with a get request
@@ -42,7 +66,7 @@ def get_mklittlefs_binary():
             api_json = api_response.json()
         
         except requests.exceptions.RequestException as e:
-            print(e,'\n')
+            print(f'\n{e}')
             exit(1)
    
         # determine the platform str to use based on current OS in use
@@ -64,7 +88,7 @@ def get_mklittlefs_binary():
                     filename = asset['name']
                     break
         except KeyError as e:
-            print('Error: The following JSON keys were not found from the request:', e,'\n')
+            print(f'\nError: The following JSON keys were not found from the request: {e}')
             exit(1)
             
         try:
@@ -73,7 +97,7 @@ def get_mklittlefs_binary():
             file_response.raise_for_status()
 
         except requests.exceptions.RequestException as e:
-            print(e,'\n')
+            print(f'\n{e}')
             exit(1)
 
         try:
@@ -82,10 +106,10 @@ def get_mklittlefs_binary():
                 compressed_file.write(file_response.content)
             compressed_file.close()
 
-            print('Succesfully downloaded', filename,'\n')
+            print(f'\nSuccesfully downloaded {filename}')
 
         except IOError as e:
-            print(e,'\n')
+            print(f'\n{e}')
             exit(1)
                
         try: 
@@ -99,7 +123,7 @@ def get_mklittlefs_binary():
                 file.extractall(filter='data')
                 file.close()
 
-            print('Succesfully uncompressed', filename,'\n')
+            print(f'\nSuccesfully uncompressed {filename}')
         
         except (tarfile.TarError, zipfile.BadZipFile) as e:
             print(e)
@@ -110,21 +134,20 @@ def get_mklittlefs_binary():
     MKLITTLEFS_BIN_PATH = next((f'mklittlefs/mklittlefs{ext}' for ext in EXTENSIONS if os.path.exists(f'mklittlefs/mklittlefs{ext}')), None)
 
 def make_littlefs_binary():
-    print('Creating',LITTLEFS_BIN_PATH,'...\n')
+    print(f'\nCreating {LITTLEFS_BIN_PATH}...')
     try:
         cmd = [MKLITTLEFS_BIN_PATH, "-c", DATA_FOLDER, "-p", "256", "-b", "8192", "-s", "2072576", LITTLEFS_BIN_PATH]
         subprocess.run(cmd, capture_output=True, text=True) # run the above command to create the littlefs filesystem with the text file data
-        print('Succesfully created:', LITTLEFS_BIN_PATH, 'with', DATA_FOLDER, 'data\n')
+        print(f'\nSuccesfully created: {LITTLEFS_BIN_PATH} with {DATA_FOLDER_FILE[0]}')
     
     except subprocess.CalledProcessError as e:
-        print(f"Error: mklittlefs failed with exit code {e.returncode}",'\n')
-        # print("Output:\n", e.stderr if e.stderr else e.stdout)
+        print(f'\nError: mklittlefs failed with exit code {e.returncode}')
 
     except FileNotFoundError:
-        print(f"Error: mklittlefs binary not found at {MKLITTLEFS_BIN_PATH}",'\n')
+        print(f'\nError: mklittlefs binary not found at {MKLITTLEFS_BIN_PATH}')
 
     except PermissionError:
-        print(f"Error: Permission denied when executing {MKLITTLEFS_BIN_PATH}",'\n')
+        print(f'\nError: Permission denied when executing {MKLITTLEFS_BIN_PATH}')
 
 def pop_esp_array():
     # determine esp name format as this is different among operating systems
@@ -140,41 +163,33 @@ def pop_esp_array():
         if esp.startswith(os_esp_format):
             ESP_ARRAY.append(esp)
 
-def check_data_file():
-
-    text_files = ['macs.txt', 'deauth_settings.txt']
-
-    # check if DATA_DIRECTORY exists
-    if not os.path.isdir(DATA_FOLDER):
-        print(f'{DATA_FOLDER} folder not found, please create this directory...\n')
-        exit(1)
-
-    visible_files = [file for file in os.listdir(DATA_FOLDER) if not file.startswith('.') and os.path.isfile(os.path.join(DATA_FOLDER, file))]
-
-    if len(visible_files) != 1:
-        print(f'{DATA_FOLDER} folder is either empty or contains more than 1 file...\n')
-        exit(1)
-
-    file = visible_files[0]
-    if file not in text_files:
-        print(f'{DATA_FOLDER} folder should only contain ONE of the following: {text_files}\n')
-        exit(1)
-    
-    print(f'{file} found in {DATA_FOLDER} folder...\n')
+def change_file_channel(channel):
+    # read all lines in deauth_settings.txt
+    file_lines = open(f'{DATA_FOLDER}deauth_settings.txt', 'r').readlines()
+    # process the first line (channel=1) find the first number and replace that number with new channel
+    file_lines[0] = re.sub(r'\d+', channel, file_lines[0], count=1)
+    # write all lines including the changed channel line back to the file
+    open(f'{DATA_FOLDER}deauth_settings.txt', 'w').writelines(file_lines)
 
 def upload_file_to_esp():
+    channel_array = [1,2,3,4,5,6,7,8,9,10,11,12] 
+    index = 0
+    current_channel = str(channel_array[index])
     # loop through the esp array and for each esp
     for esp in ESP_ARRAY:
-        print(f'\nUploading  data to ESP: {esp}...\n')
+        # if files are being uploaded to the deauther
+        # change the files channel starting at index 0 of the channel_array
+        change_file_channel(current_channel)
+        print(f'\nUploading {DATA_FOLDER_FILE[0]} to ESP: {esp} on channel {current_channel}...\n')
         cmd = ['esptool.py', '--chip', CHIP, '--port', f'/dev/{esp}', '--baud', BAUD_RATE, 'write_flash', '2097152', LITTLEFS_BIN_PATH]
         subprocess.run(cmd) # run the above command to upload the littlefs filesystem with the text data to the current esp in the array
- 
-print('\nDetected OS:',OS_PLATFORM, '\n')
+        # increment index so next channel is added to next esp file upload in loop
+        index+=1
+
+print('\nDetected OS:', OS_PLATFORM, '\n')
 
 check_data_file()
-
-# pop_esp_array()
-# print(ESP_ARRAY)
-# get_mklittlefs_binary()
-# make_littlefs_binary()
-# upload_file_to_esp()
+pop_esp_array()
+get_mklittlefs_binary()
+make_littlefs_binary()
+upload_file_to_esp()
