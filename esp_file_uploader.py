@@ -42,22 +42,6 @@ def check_data_file():
     
     print(f'\n{file} found in {DATA_FOLDER} folder...')
 
-def upload_options():
-
-    while True:
-        user_choice = input('\nChoose an ESP project to upload to: \n1: DEAUTHER\n2: CAM-DETECTOR\n:')
-        global ESP_TYPE
-
-        if user_choice != '1' or user_choice != '2':
-            print('Error: Invalid Option! Please choose 1 or 2!')
-            continue
-        if user_choice == '1':
-            ESP_TYPE = 'DEAUTHER'
-            break
-        elif user_choice == '2':
-            ESP_TYPE = 'CAM-DETECTOR'
-            break
-
 def get_mklittlefs_binary():
 
     global MKLITTLEFS_BIN_PATH
@@ -193,17 +177,10 @@ def change_file_channel(channel):
     open(f'{DATA_FOLDER}deauth_settings.txt', 'w').writelines(file_lines)
     print(f'\nChanged {DATA_FOLDER_FILES[0]} channel to {channel}')
     
-def upload_file_to_esp():
-    # if the esp array is empty
-    if not ESP_ARRAY:
-        print('\nNo ESP boards were detected, check you have plugged in your desired boards...')
-        while not ESP_ARRAY:
-            time.sleep(1)
-
-    channel = 1
-
+def upload_file_to_esp():   
     # loop through the esp array and for each esp
-    for esp in ESP_ARRAY:
+    for channel, esp in enumerate(ESP_ARRAY, start=1):
+    # for esp in ESP_ARRAY:
         # if the deauth_settings.txt is foundin the data folder
         if DATA_FOLDER_FILES[0] == 'deauth_settings.txt':
             # create a new littelfs binary with the channel
@@ -214,16 +191,24 @@ def upload_file_to_esp():
         else:
             make_littlefs_binary()
 
-        print(f'\nUploading {DATA_FOLDER_FILES[0]} to ESP: {esp}')
+        print(f'\nUploading {DATA_FOLDER_FILES[0]} to ESP: {esp}\n')
         cmd = ['esptool.py', '--chip', CHIP, '--port', f'/dev/{esp}', '--baud', BAUD_RATE, 'write_flash', '2097152', LITTLEFS_BIN_PATH]
         subprocess.run(cmd) # run the above command to upload the littlefs filesystem with the text data to the current esp in the array
     
+    # cleanup littlefs.bin when finished
+    os.remove(LITTLEFS_BIN_PATH)
+    
 print(f'\nDetected OS: {OS_PLATFORM}')
-print(f'\nPlease plug in your ESP boards...')
+
+pop_esp_array()
+# if the esp array is empty
+if not ESP_ARRAY:
+    print('\nNo ESP boards were detected, check you have plugged in your desired boards...')
+    exit(1)
+
+print('\nESP Boards Detected:\n')
+for i, esp in enumerate(ESP_ARRAY, start=1): print(f'{i}:{esp}')
 
 check_data_file()
-# upload_options()
-pop_esp_array()
 get_mklittlefs_binary()
-# make_littlefs_binary()
 upload_file_to_esp()
