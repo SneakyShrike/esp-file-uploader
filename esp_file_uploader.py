@@ -4,6 +4,7 @@ import os
 import re
 import requests
 import tarfile
+import time
 from zipfile import ZipFile 
 
 # vars for generating littlefs binary
@@ -148,9 +149,14 @@ def get_mklittlefs_binary():
     
     MKLITTLEFS_BIN_PATH = next((f'mklittlefs/mklittlefs{ext}' for ext in EXTENSIONS if os.path.exists(f'mklittlefs/mklittlefs{ext}')), None)
 
-def make_littlefs_binary():
+def make_littlefs_binary(channel):
     print(f'\nCreating {LITTLEFS_BIN_PATH}...')
     try:
+        # if the deauth_settings.txt is foundin the data folder
+        if DATA_FOLDER_FILES[0] == 'deauth_settings.txt':
+            # modify deauth_settings.txt with the channel
+            change_file_channel((str(channel)))
+
         cmd = [MKLITTLEFS_BIN_PATH, "-c", DATA_FOLDER, "-p", "256", "-b", "8192", "-s", "2072576", LITTLEFS_BIN_PATH]
         subprocess.run(cmd, capture_output=True, text=True) # run the above command to create the littlefs filesystem with the text file data
         print(f'\nSuccesfully created: {LITTLEFS_BIN_PATH} with {DATA_FOLDER_FILES[0]}')
@@ -189,34 +195,29 @@ def change_file_channel(channel):
     
 def upload_file_to_esp():
     # if the esp array is empty
-    while True:
-        if not ESP_ARRAY:
-            print('\nNo ESP boards were detected, check you have plugged in your desired boards...')
-            continue
-        break
+    if not ESP_ARRAY:
+        print('\nNo ESP boards were detected, check you have plugged in your desired boards...')
+        while not ESP_ARRAY:
+            time.sleep(1)
 
-    #  if we're uploading files to a deauther ESP
-    if DATA_FOLDER_FILES[0] == 'deauth_settings.txt':
-    # if ESP_TYPE == 'DEAUTHER':
-        # populate channel array to match how many ESP boards are plugged in
-        channel_array = list(range(1,len(ESP_ARRAY)+1))
-        index = 0
-        current_channel = str(channel_array[index])
-        print(channel_array)
+    channel = 1
+
     # loop through the esp array and for each esp
     for esp in ESP_ARRAY:
-        # if files are being uploaded to the deauther
+        # if the deauth_settings.txt is foundin the data folder
         if DATA_FOLDER_FILES[0] == 'deauth_settings.txt':
-        # if ESP_TYPE == 'DEAUTHER':
-            # change the files channel starting at index 0 of the channel_array
-            change_file_channel(current_channel)
-            # increment index so next channel is added to next esp file upload in loop
-            index = index+1
-            print(index)
+            # create a new littelfs binary with the channel
+            make_littlefs_binary(channel)
+            # increment the channel for the next esp
+            channel+=1
+        # else we just call the make_littlefs_binary without the channel
+        else:
+            make_littlefs_binary()
+
         print(f'\nUploading {DATA_FOLDER_FILES[0]} to ESP: {esp}')
         cmd = ['esptool.py', '--chip', CHIP, '--port', f'/dev/{esp}', '--baud', BAUD_RATE, 'write_flash', '2097152', LITTLEFS_BIN_PATH]
         subprocess.run(cmd) # run the above command to upload the littlefs filesystem with the text data to the current esp in the array
-      
+    
 print(f'\nDetected OS: {OS_PLATFORM}')
 print(f'\nPlease plug in your ESP boards...')
 
@@ -224,5 +225,5 @@ check_data_file()
 # upload_options()
 pop_esp_array()
 get_mklittlefs_binary()
-make_littlefs_binary()
+# make_littlefs_binary()
 upload_file_to_esp()
