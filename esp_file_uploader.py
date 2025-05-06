@@ -161,12 +161,21 @@ def pop_esp_array():
         os_esp_format = 'tty.usbserial'
     if OS_PLATFORM == 'linux':
         os_esp_format = 'ttyUSB'
-    # TODO add windows option
+        
+    if OS_PLATFORM == 'win32':
+        os_esp_format = 'COM'
+        powershell_cmd = ['powershell -Command "Get-WMIObject Win32_SerialPort | Select-Object DeviceID"']
+        esp_list = subprocess.run(powershell_cmd, capture_output=True, text=True)
 
-    # on mac and linux loop through /dev dir and add found esps to the array
-    for esp in os.listdir('/dev'):
-        if esp.startswith(os_esp_format):
-            ESP_ARRAY.append(esp)
+        for esp in esp_list:
+            if esp.startswith(os_esp_format):
+                ESP_ARRAY.append(esp)
+
+    if OS_PLATFORM == 'darwin' or OS_PLATFORM == 'linux':
+        # on mac and linux loop through /dev dir and add found esps to the array
+        for esp in os.listdir('/dev'):
+            if esp.startswith(os_esp_format):
+                ESP_ARRAY.append(esp)
 
 def change_file_channel(channel):
     # read all lines in deauth_settings.txt
