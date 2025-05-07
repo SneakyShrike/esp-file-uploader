@@ -170,7 +170,6 @@ def pop_esp_array():
         for esp in esp_output.splitlines():
             if esp.startswith(os_esp_format):
                 ESP_ARRAY.append(esp.strip())
-        print(ESP_ARRAY)
 
     if OS_PLATFORM == 'darwin' or OS_PLATFORM == 'linux':
         # on mac and linux loop through /dev dir and add found esps to the array
@@ -203,34 +202,46 @@ def upload_file_to_esp():
         # for each esp attempt to upload twice 
         # (windows sometimes disconnects and reconnects COM ports when switching COM port)
         for i in range(2):
+
+            esptool_fmt = ''
+            port_fmt = ''
+
             upload_error = f"A fatal error occurred: Could not open {esp}, the port is busy or doesn't exist."
             success_message = "Hash of data verified."
+    
+            # determine platform for upload command format
+            if OS_PLATFORM == 'darwin' or OS_PLATFORM == 'linux':
+                esptool_fmt = 'esptool.py'
+                port_fmt = f'/dev/{esp}'
+            elif OS_PLATFORM == 'win32':
+                esptool_fmt == 'esptool'
+                port_fmt == esp
+
             print(f'\nUploading {DATA_FOLDER_FILES[0]} to ESP: {esp}...\n')
-            # cmd = ['esptool.py', '--chip', CHIP, '--port', f'/dev/{esp}', '--baud', BAUD_RATE, 'write_flash', '2097152', LITTLEFS_BIN_PATH]
-            upload_cmd = ['esptool', '--chip', CHIP, '--port', esp, '--baud', BAUD_RATE, 'write_flash', '2097152', LITTLEFS_BIN_PATH]
+            upload_cmd = [esptool_fmt, '--chip', CHIP, '--port', port_fmt, '--baud', BAUD_RATE, 'write_flash', '2097152', LITTLEFS_BIN_PATH]
             # run the above command to upload the littlefs filesystem with the text data to the current esp in the array and capture the cmd output into a var
             output = subprocess.run(upload_cmd, capture_output=True, text=True) 
             # if the cmd output contains upload_error and the current iteration is 0
             if upload_error in output.stdout and i == 0:
                 print('Trying once more...')
-                # we try again on the next iteraton (takes into account windows disconnnecting and reconnecting COM ports)     
+                # try again on the next iteraton (takes into account windows disconnnecting and reconnecting COM ports)     
                 continue
             # if the cmd output contains upload_error and the iteration is not the first 
             elif upload_error in output.stdout and i < 0:
-                # we don't try again and terminate the program
+                # don't try again and terminate the program
                 print(f'Failed to upload {DATA_FOLDER_FILES[0]} to ESP: {esp}...\n')
                 exit(1)
             # else the file uploaded sucessfully. 
             elif success_message in output.stdout:
                 # break out of the inner loop and move into the next esp in the outer loop
-                print(f'Succesfully uploaded {DATA_FOLDER_FILES[0]} to ESP: {esp}...\n')
+                print(f'Succesfully uploaded {DATA_FOLDER_FILES[0]} to ESP: {esp}\n')
                 break
-
-    
+        print('-----------------------------------------------------------------------------')
+        print('\nFinished Uploading!\n')
 
     # cleanup littlefs.bin when finished
     os.remove(LITTLEFS_BIN_PATH)
-    
+
 print(f'\nDetected OS: {OS_PLATFORM}')
 
 pop_esp_array()
@@ -240,8 +251,10 @@ if not ESP_ARRAY:
     exit(1)
 
 print('\nESP Boards Detected:\n')
-for i, esp in enumerate(ESP_ARRAY, start=1): print(f'{i}:{esp}')
+for i, esp in enumerate(ESP_ARRAY, start=1): print(f'{i}: {esp}')
 
 check_data_file()
 get_mklittlefs_binary()
+print('\n-----------------------------------------------------------------------------')
 upload_file_to_esp()
+# TODO add function to check serial output of each esp
