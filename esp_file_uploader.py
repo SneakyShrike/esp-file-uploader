@@ -164,12 +164,13 @@ def pop_esp_array():
         
     if OS_PLATFORM == 'win32':
         os_esp_format = 'COM'
-        powershell_cmd = ['powershell -Command "Get-WMIObject Win32_SerialPort | Select-Object DeviceID"']
-        esp_list = subprocess.run(powershell_cmd, capture_output=True, text=True)
-
-        for esp in esp_list:
+        powershell_cmd = 'powershell -Command "Get-WMIObject Win32_SerialPort | Select-Object DeviceID"'
+        esp_output = subprocess.check_output(powershell_cmd, text=True)
+    
+        for esp in esp_output.splitlines():
             if esp.startswith(os_esp_format):
-                ESP_ARRAY.append(esp)
+                ESP_ARRAY.append(esp.strip())
+        print(ESP_ARRAY)
 
     if OS_PLATFORM == 'darwin' or OS_PLATFORM == 'linux':
         # on mac and linux loop through /dev dir and add found esps to the array
@@ -189,7 +190,6 @@ def change_file_channel(channel):
 def upload_file_to_esp():   
     # loop through the esp array and for each esp
     for channel, esp in enumerate(ESP_ARRAY, start=1):
-    # for esp in ESP_ARRAY:
         # if the deauth_settings.txt is foundin the data folder
         if DATA_FOLDER_FILES[0] == 'deauth_settings.txt':
             # create a new littelfs binary with the channel
@@ -200,10 +200,34 @@ def upload_file_to_esp():
         else:
             make_littlefs_binary()
 
-        print(f'\nUploading {DATA_FOLDER_FILES[0]} to ESP: {esp}\n')
-        cmd = ['esptool.py', '--chip', CHIP, '--port', f'/dev/{esp}', '--baud', BAUD_RATE, 'write_flash', '2097152', LITTLEFS_BIN_PATH]
-        subprocess.run(cmd) # run the above command to upload the littlefs filesystem with the text data to the current esp in the array
+        # for each esp attempt to upload twice 
+        # (windows sometimes disconnects and reconnects COM ports when switching COM port)
+        for i in range(2):
+            upload_error = f"A fatal error occurred: Could not open {esp}, the port is busy or doesn't exist."
+            success_message = "Hash of data verified."
+            print(f'\nUploading {DATA_FOLDER_FILES[0]} to ESP: {esp}...\n')
+            # cmd = ['esptool.py', '--chip', CHIP, '--port', f'/dev/{esp}', '--baud', BAUD_RATE, 'write_flash', '2097152', LITTLEFS_BIN_PATH]
+            upload_cmd = ['esptool', '--chip', CHIP, '--port', esp, '--baud', BAUD_RATE, 'write_flash', '2097152', LITTLEFS_BIN_PATH]
+            # run the above command to upload the littlefs filesystem with the text data to the current esp in the array and capture the cmd output into a var
+            output = subprocess.run(upload_cmd, capture_output=True, text=True) 
+            # if the cmd output contains upload_error and the current iteration is 0
+            if upload_error in output.stdout and i == 0:
+                print('Trying once more...')
+                # we try again on the next iteraton (takes into account windows disconnnecting and reconnecting COM ports)     
+                continue
+            # if the cmd output contains upload_error and the iteration is not the first 
+            elif upload_error in output.stdout and i < 0:
+                # we don't try again and terminate the program
+                print(f'Failed to upload {DATA_FOLDER_FILES[0]} to ESP: {esp}...\n')
+                exit(1)
+            # else the file uploaded sucessfully. 
+            elif success_message in output.stdout:
+                # break out of the inner loop and move into the next esp in the outer loop
+                print(f'Succesfully uploaded {DATA_FOLDER_FILES[0]} to ESP: {esp}...\n')
+                break
+
     
+
     # cleanup littlefs.bin when finished
     os.remove(LITTLEFS_BIN_PATH)
     
