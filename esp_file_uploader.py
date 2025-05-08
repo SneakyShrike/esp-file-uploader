@@ -29,13 +29,18 @@ def check_data_file():
         print(f'\n{DATA_FOLDER} folder not found, please create this directory...')
         exit(1)
 
+    # filter the DATA_DIRECTORY to only include visible files (files that don't start with .)
     visible_files = [file for file in DATA_FOLDER_FILES if not file.startswith('.') and os.path.isfile(os.path.join(DATA_FOLDER, file))]
 
+    # if the counted files in DATA_DIRECTORY is not exactly one
     if len(visible_files) != 1:
         print(f'\n{DATA_FOLDER} folder is either empty or contains more than 1 file...')
         exit(1)
 
+    # assign the one file in DATA_DIRECTORY to a var
     file = visible_files[0]
+
+    # check if that one file in DATA_DIRECTORY matches a value in the text_files array
     if file not in text_files:
         print(f'\n{DATA_FOLDER} folder should only contain ONE of the following: {text_files}')
         exit(1)
@@ -161,20 +166,25 @@ def pop_esp_array():
         os_esp_format = 'tty.usbserial'
     if OS_PLATFORM == 'linux':
         os_esp_format = 'ttyUSB'
-        
+
+    # on windows evoke the below powershell command to retrieve the ESP's (COM devices)
     if OS_PLATFORM == 'win32':
         os_esp_format = 'COM'
         powershell_cmd = 'powershell -Command "Get-WMIObject Win32_SerialPort | Select-Object DeviceID"'
         esp_output = subprocess.check_output(powershell_cmd, text=True)
     
+        # the powershell command returns a single string so we need to filter and split the string into seperate strings
+        # each seperated string represents an ESP (COM) device
         for esp in esp_output.splitlines():
             if esp.startswith(os_esp_format):
+                # add each ESP string to the array
                 ESP_ARRAY.append(esp.strip())
 
     if OS_PLATFORM == 'darwin' or OS_PLATFORM == 'linux':
-        # on mac and linux loop through /dev dir and add found esps to the array
+        # on mac and linux loop through /dev dir and add found ESP's to the array
         for esp in os.listdir('/dev'):
             if esp.startswith(os_esp_format):
+                # add each ESP to the array
                 ESP_ARRAY.append(esp)
 
 def change_file_channel(channel):
@@ -189,18 +199,15 @@ def change_file_channel(channel):
 def upload_file_to_esp():   
     # loop through the esp array and for each esp
     for channel, esp in enumerate(ESP_ARRAY, start=1):
-        # if the deauth_settings.txt is foundin the data folder
+        # if the deauth_settings.txt is found in the data folder
         if DATA_FOLDER_FILES[0] == 'deauth_settings.txt':
             # create a new littelfs binary with the channel
             make_littlefs_binary(channel)
             # increment the channel for the next esp
             channel+=1
-        # # else we just call the make_littlefs_binary without the channel
-        # elif DATA_FOLDER_FILES[0] == 'macs.txt':
-        #     make_littlefs_binary()
 
         # for each esp attempt to upload twice 
-        # (windows sometimes disconnects and reconnects COM ports when switching COM port)
+        # (windows sometimes disconnects and reconnects COM ports when switching COM port so we try to upload again if it fails)
         for i in range(2):
 
             esptool_fmt = ''
@@ -242,22 +249,28 @@ def upload_file_to_esp():
     # cleanup littlefs.bin when finished
     os.remove(LITTLEFS_BIN_PATH)
 
+# print out detected OS
 print(f'\nDetected OS: {OS_PLATFORM}')
 
 pop_esp_array()
+
 # if the esp array is empty
 if not ESP_ARRAY:
     print('\nNo ESP boards were detected, check you have plugged in your desired boards...')
     exit(1)
 
+# print out the list of detected boards
 print('\nESP Boards Detected:\n')
 for i, esp in enumerate(ESP_ARRAY, start=1): print(f'{i}: {esp}')
 
 check_data_file()
 get_mklittlefs_binary()
+
 # if we are uploading to cam detector we only need to create mklittlefs binary once
 if DATA_FOLDER_FILES[0] == 'macs.txt':
     make_littlefs_binary()
 print('\n-----------------------------------------------------------------------------')
+
 upload_file_to_esp()
+
 # TODO add function to check serial output of each esp
