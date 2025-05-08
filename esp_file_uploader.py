@@ -214,8 +214,8 @@ def upload_file_to_esp():
                 esptool_fmt = 'esptool.py'
                 port_fmt = f'/dev/{esp}'
             elif OS_PLATFORM == 'win32':
-                esptool_fmt == 'esptool'
-                port_fmt == esp
+                esptool_fmt = 'esptool'
+                port_fmt = f'{esp}'
 
             print(f'\nUploading {DATA_FOLDER_FILES[0]} to ESP: {esp}...\n')
             upload_cmd = [esptool_fmt, '--chip', CHIP, '--port', port_fmt, '--baud', BAUD_RATE, 'write_flash', '2097152', LITTLEFS_BIN_PATH]
