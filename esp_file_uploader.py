@@ -133,7 +133,7 @@ def get_mklittlefs_binary():
     
     MKLITTLEFS_BIN_PATH = next((f'mklittlefs/mklittlefs{ext}' for ext in EXTENSIONS if os.path.exists(f'mklittlefs/mklittlefs{ext}')), None)
 
-def make_littlefs_binary(channel):
+def make_littlefs_binary(channel=None):
     print(f'\nCreating {LITTLEFS_BIN_PATH}...')
     try:
         # if the deauth_settings.txt is foundin the data folder
@@ -196,7 +196,7 @@ def upload_file_to_esp():
             # increment the channel for the next esp
             channel+=1
         # else we just call the make_littlefs_binary without the channel
-        else:
+        elif DATA_FOLDER_FILES[0] == 'macs.txt':
             make_littlefs_binary()
 
         # for each esp attempt to upload twice 
@@ -237,7 +237,7 @@ def upload_file_to_esp():
                 print(f'Succesfully uploaded {DATA_FOLDER_FILES[0]} to ESP: {esp}\n')
                 break
         print('-----------------------------------------------------------------------------')
-        print('\nFinished Uploading!\n')
+    print('\nFinished Uploading!\n')
 
     # cleanup littlefs.bin when finished
     os.remove(LITTLEFS_BIN_PATH)
