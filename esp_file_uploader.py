@@ -195,9 +195,9 @@ def upload_file_to_esp():
             make_littlefs_binary(channel)
             # increment the channel for the next esp
             channel+=1
-        # else we just call the make_littlefs_binary without the channel
-        elif DATA_FOLDER_FILES[0] == 'macs.txt':
-            make_littlefs_binary()
+        # # else we just call the make_littlefs_binary without the channel
+        # elif DATA_FOLDER_FILES[0] == 'macs.txt':
+        #     make_littlefs_binary()
 
         # for each esp attempt to upload twice 
         # (windows sometimes disconnects and reconnects COM ports when switching COM port)
@@ -255,6 +255,9 @@ for i, esp in enumerate(ESP_ARRAY, start=1): print(f'{i}: {esp}')
 
 check_data_file()
 get_mklittlefs_binary()
+# if we are uploading to cam detector we only need to create mklittlefs binary once
+if DATA_FOLDER_FILES[0] == 'macs.txt':
+    make_littlefs_binary()
 print('\n-----------------------------------------------------------------------------')
 upload_file_to_esp()
 # TODO add function to check serial output of each esp
