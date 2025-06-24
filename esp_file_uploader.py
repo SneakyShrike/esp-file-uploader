@@ -5,6 +5,7 @@ import re
 import requests
 import tarfile
 import time
+import serial
 from zipfile import ZipFile 
 
 # vars for generating littlefs binary
@@ -244,10 +245,37 @@ def upload_file_to_esp():
                 print(f'Succesfully uploaded {DATA_FOLDER_FILES[0]} to ESP: {esp}\n')
                 break
         print('-----------------------------------------------------------------------------')
-    print('\nFinished Uploading!\n')
+        check_serial_output(port_fmt)
+    # print('\nFinished Uploading!\n')
 
     # cleanup littlefs.bin when finished
     os.remove(LITTLEFS_BIN_PATH)
+
+def check_serial_output(esp):
+    print(f'\nChecking serial output for {esp}...\n')
+    # setup serial connection for current esp
+    ser = serial.Serial(esp, 115200, timeout=2)
+
+    # disable data terminal ready (dtr) and request to send (rts)
+    # as this interferes with the serial output
+    ser.dtr = False
+    ser.rts = False
+
+    while True:
+        # read the serial output one line at a time
+        line = ser.readline().decode('utf-8', errors='replace').strip('\n')
+        # skip printing the line if it contains any � symbols as this is boot code for the esp
+        if '�' in line:
+            continue
+        # if the line output is empty we can terminate the serial connection
+        if not line:
+            ser.close()
+            break
+        
+        # print the serial output line if none of the above conditions are met 
+        print(line)
+
+    print('\n-----------------------------------------------------------------------------')
 
 # print out detected OS
 print(f'\nDetected OS: {OS_PLATFORM}')
@@ -273,4 +301,3 @@ print('\n-----------------------------------------------------------------------
 
 upload_file_to_esp()
 
-# TODO add function to check serial output of each esp
