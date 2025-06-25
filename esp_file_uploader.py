@@ -4,8 +4,8 @@ import os
 import re
 import requests
 import tarfile
-import time
 import serial
+from serial.tools import list_ports
 from zipfile import ZipFile 
 
 # vars for generating littlefs binary
@@ -17,7 +17,6 @@ DATA_FOLDER_FILES = os.listdir(DATA_FOLDER)
 LITTLEFS_BIN_PATH = 'littlefs.bin'
 
 # vars for uploading file to esp
-ESP_ARRAY = [] # each plugged in esp name will be stored in an array
 CHIP = 'esp8266'
 BAUD_RATE = '115200'
 
@@ -52,7 +51,7 @@ def get_mklittlefs_binary():
 
     global MKLITTLEFS_BIN_PATH
     api_url = 'https://api.github.com/repos/earlephilhower/mklittlefs/releases/tags/2.5.1-1' # the mklittlefs binary must be 2.5.1-1 because the deauther board core is on an earlier verison of Ardunio core
-    platform_str = None
+    download_platform_str = None
     download_url = None
     filename = None
 
@@ -76,18 +75,18 @@ def get_mklittlefs_binary():
             exit(1)
    
         # determine the platform str to use based on current OS in use
-        platform_map = {
+        download_platform_map = {
         "win32": "x86_64-w64-mingw32",
         "darwin": "x86_64-apple-darwin",
         "linux": "x86_64-linux-gnu"}
 
-        platform_str = platform_map.get(OS_PLATFORM)
+        download_platform_str = download_platform_map.get(OS_PLATFORM)
 
         try:
         # go to the assets section of the json and loop every asset (numbered)
             for asset in api_json['assets']:
                 # if the current asset number has the name section with a value of platform_str
-                if platform_str in asset['name']:
+                if download_platform_str in asset['name']:
                     # fetch download file url
                     download_url = asset['browser_download_url']
                     # also fetch the current asset filename
@@ -160,34 +159,6 @@ def make_littlefs_binary(channel=None):
     except PermissionError:
         print(f'\nError: Permission denied when executing {MKLITTLEFS_BIN_PATH}')
 
-def pop_esp_array():
-    # determine esp name format as this is different among operating systems
-    os_esp_format = ''
-    if OS_PLATFORM == 'darwin':
-        os_esp_format = 'tty.usbserial'
-    if OS_PLATFORM == 'linux':
-        os_esp_format = 'ttyUSB'
-
-    # on windows evoke the below powershell command to retrieve the ESP's (COM devices)
-    if OS_PLATFORM == 'win32':
-        os_esp_format = 'COM'
-        powershell_cmd = 'powershell -Command "Get-WMIObject Win32_SerialPort | Select-Object DeviceID"'
-        esp_output = subprocess.check_output(powershell_cmd, text=True)
-    
-        # the powershell command returns a single string so we need to filter and split the string into seperate strings
-        # each seperated string represents an ESP (COM) device
-        for esp in esp_output.splitlines():
-            if esp.startswith(os_esp_format):
-                # add each ESP string to the array
-                ESP_ARRAY.append(esp.strip())
-
-    if OS_PLATFORM == 'darwin' or OS_PLATFORM == 'linux':
-        # on mac and linux loop through /dev dir and add found ESP's to the array
-        for esp in os.listdir('/dev'):
-            if esp.startswith(os_esp_format):
-                # add each ESP to the array
-                ESP_ARRAY.append(esp)
-
 def change_file_channel(channel):
     # read all lines in deauth_settings.txt
     file_lines = open(f'{DATA_FOLDER}deauth_settings.txt', 'r').readlines()
@@ -197,56 +168,52 @@ def change_file_channel(channel):
     open(f'{DATA_FOLDER}deauth_settings.txt', 'w').writelines(file_lines)
     print(f'\nChanged {DATA_FOLDER_FILES[0]} channel to {channel}')
     
-def upload_file_to_esp():   
-    # loop through the esp array and for each esp
-    for channel, esp in enumerate(ESP_ARRAY, start=1):
-        # if the deauth_settings.txt is found in the data folder
-        if DATA_FOLDER_FILES[0] == 'deauth_settings.txt':
-            # create a new littelfs binary with the channel
-            make_littlefs_binary(channel)
-            # increment the channel for the next esp
-            channel+=1
+def upload_file_to_esp(esp, channel):   
+
+    # if the deauth_settings.txt is found in the data folder
+    if DATA_FOLDER_FILES[0] == 'deauth_settings.txt':
+        # create a new littelfs binary with the channel
+        make_littlefs_binary(channel)
+        # increment the channel for the next esp
+        channel+=1
 
         # for each esp attempt to upload twice 
         # (windows sometimes disconnects and reconnects COM ports when switching COM port so we try to upload again if it fails)
-        for i in range(2):
+    for i in range(2):
 
-            esptool_fmt = ''
-            port_fmt = ''
+        esptool_fmt = ''
+        port_fmt = ''
 
-            upload_error = f"A fatal error occurred: Could not open {esp}, the port is busy or doesn't exist."
-            success_message = "Hash of data verified."
-    
-            # determine platform for upload command format
-            if OS_PLATFORM == 'darwin' or OS_PLATFORM == 'linux':
-                esptool_fmt = 'esptool.py'
-                port_fmt = f'/dev/{esp}'
-            elif OS_PLATFORM == 'win32':
-                esptool_fmt = 'esptool'
-                port_fmt = f'{esp}'
+        upload_error = f"A fatal error occurred: Could not open {esp}, the port is busy or doesn't exist."
+        success_message = "Hash of data verified."
 
-            print(f'\nUploading {DATA_FOLDER_FILES[0]} to ESP: {esp}...\n')
-            upload_cmd = [esptool_fmt, '--chip', CHIP, '--port', port_fmt, '--baud', BAUD_RATE, 'write_flash', '2097152', LITTLEFS_BIN_PATH]
-            # run the above command to upload the littlefs filesystem with the text data to the current esp in the array and capture the cmd output into a var
-            output = subprocess.run(upload_cmd, capture_output=True, text=True) 
-            # if the cmd output contains upload_error and the current iteration is 0
-            if upload_error in output.stdout and i == 0:
-                print('Trying once more...')
-                # try again on the next iteraton (takes into account windows disconnnecting and reconnecting COM ports)     
-                continue
-            # if the cmd output contains upload_error and the iteration is not the first 
-            elif upload_error in output.stdout and i < 0:
-                # don't try again and terminate the program
-                print(f'Failed to upload {DATA_FOLDER_FILES[0]} to ESP: {esp}...\n')
-                exit(1)
-            # else the file uploaded sucessfully. 
-            elif success_message in output.stdout:
-                # break out of the inner loop and move into the next esp in the outer loop
-                print(f'Succesfully uploaded {DATA_FOLDER_FILES[0]} to ESP: {esp}\n')
-                break
-        print('-----------------------------------------------------------------------------')
-        check_serial_output(port_fmt)
-    # print('\nFinished Uploading!\n')
+        esptool_format_map = {
+            'win32': 'esptool',
+            'darwin': 'esptool.py',
+            'linux': 'esptool.py'}
+        
+        esptool_fmt = esptool_format_map[OS_PLATFORM]
+
+        print(f'\nUploading {DATA_FOLDER_FILES[0]} to {esp}...\n')
+        upload_cmd = [esptool_fmt, '--chip', CHIP, '--port', esp, '--baud', BAUD_RATE, 'write_flash', '2097152', LITTLEFS_BIN_PATH]
+        # run the above command to upload the littlefs filesystem with the text data to the current esp in the array and capture the cmd output into a var
+        output = subprocess.run(upload_cmd, capture_output=True, text=True) 
+        # if the cmd output contains upload_error and the current iteration is 0
+        if upload_error in output.stdout and i == 0:
+            print('Trying once more...')
+            # try again on the next iteraton (takes into account windows disconnnecting and reconnecting COM ports)     
+            continue
+        # if the cmd output contains upload_error and the iteration is not the first 
+        elif upload_error in output.stdout and i < 0:
+            # don't try again and terminate the program
+            print(f'Failed to upload {DATA_FOLDER_FILES[0]} to {esp}...\n')
+            exit(1)
+        # else the file uploaded sucessfully. 
+        elif success_message in output.stdout:
+            # break out of the inner loop and move into the next esp in the outer loop
+            print(f'Succesfully uploaded {DATA_FOLDER_FILES[0]} to {esp}\n')
+            break
+    print('-----------------------------------------------------------------------------')
 
     # cleanup littlefs.bin when finished
     os.remove(LITTLEFS_BIN_PATH)
@@ -280,17 +247,6 @@ def check_serial_output(esp):
 # print out detected OS
 print(f'\nDetected OS: {OS_PLATFORM}')
 
-pop_esp_array()
-
-# if the esp array is empty
-if not ESP_ARRAY:
-    print('\nNo ESP boards were detected, check you have plugged in your desired boards...')
-    exit(1)
-
-# print out the list of detected boards
-print('\nESP Boards Detected:\n')
-for i, esp in enumerate(ESP_ARRAY, start=1): print(f'{i}: {esp}')
-
 check_data_file()
 get_mklittlefs_binary()
 
@@ -299,5 +255,19 @@ if DATA_FOLDER_FILES[0] == 'macs.txt':
     make_littlefs_binary()
 print('\n-----------------------------------------------------------------------------')
 
-upload_file_to_esp()
+# print out the list of detected boards
+esp_list = [esp for esp in list_ports.comports() if 'USB' in esp.hwid]
+
+if not esp_list:
+    print('\nNo ESP boards were detected, check you have plugged in your desired boards...')
+    exit(1)
+
+for i, esp in enumerate(esp_list, start=1):
+    print(f'\nESP {i}/{len(esp_list)}: {esp.device}')
+    print('\n-----------------------------------------------------------------------------')
+    upload_file_to_esp(esp.device, i)
+    check_serial_output(esp.device)
+
+print('\nUploads completed, please verify the serial output of each ESP is correct before deploying...\n')
+
 
