@@ -177,12 +177,11 @@ def upload_file_to_esp(esp, channel):
         # increment the channel for the next esp
         channel+=1
 
-        # for each esp attempt to upload twice 
-        # (windows sometimes disconnects and reconnects COM ports when switching COM port so we try to upload again if it fails)
+    # for each esp attempt to upload twice 
+    # (windows sometimes disconnects and reconnects COM ports when switching COM port so we try to upload again if it fails)
     for i in range(2):
 
         esptool_fmt = ''
-        port_fmt = ''
 
         upload_error = f"A fatal error occurred: Could not open {esp}, the port is busy or doesn't exist."
         success_message = "Hash of data verified."
@@ -215,8 +214,9 @@ def upload_file_to_esp(esp, channel):
             break
     print('-----------------------------------------------------------------------------')
 
-    # cleanup littlefs.bin when finished
-    os.remove(LITTLEFS_BIN_PATH)
+    # only delete littefs.bin after each iteration for the deauther as the text file changes for every esp
+    if DATA_FOLDER_FILES[0] == 'deauth_settings.txt':
+        os.remove(LITTLEFS_BIN_PATH)
 
 def check_serial_output(esp):
     print(f'\nChecking serial output for {esp}...\n')
@@ -255,11 +255,11 @@ if DATA_FOLDER_FILES[0] == 'macs.txt':
     make_littlefs_binary()
 print('\n-----------------------------------------------------------------------------')
 
-# print out the list of detected boards
+# filter to create a list of only usb com ports
 esp_list = [esp for esp in list_ports.comports() if 'USB' in esp.hwid]
 
 if not esp_list:
-    print('\nNo ESP boards were detected, check you have plugged in your desired boards...')
+    print('\nNo ESP boards were detected, check you have plugged in your desired boards...\n')
     exit(1)
 
 for i, esp in enumerate(esp_list, start=1):
@@ -267,6 +267,9 @@ for i, esp in enumerate(esp_list, start=1):
     print('\n-----------------------------------------------------------------------------')
     upload_file_to_esp(esp.device, i)
     check_serial_output(esp.device)
+
+# remove littlefs after program has finished uploading
+os.remove(LITTLEFS_BIN_PATH)
 
 print('\nUploads completed, please verify the serial output of each ESP is correct before deploying...\n')
 
