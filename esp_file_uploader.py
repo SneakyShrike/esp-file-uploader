@@ -268,8 +268,9 @@ for i, esp in enumerate(esp_list, start=1):
     upload_file_to_esp(esp.device, i)
     check_serial_output(esp.device)
 
-# remove littlefs after program has finished uploading
-os.remove(LITTLEFS_BIN_PATH)
+# remove littlefs if it hasn't already been deleted
+if os.path.exists(LITTLEFS_BIN_PATH):
+    os.remove(LITTLEFS_BIN_PATH)
 
 print('\nUploads completed, please verify the serial output of each ESP is correct before deploying...\n')
 
