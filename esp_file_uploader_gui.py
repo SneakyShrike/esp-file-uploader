@@ -1,6 +1,6 @@
 import sys
 import random
-from PySide6.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QPushButton, QComboBox, QTextEdit, QLabel, QProgressBar
+from PySide6.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QPushButton, QComboBox, QTextEdit, QLabel, QProgressBar, QFileDialog
 
 class MyWidget(QWidget):
     def __init__(self):
@@ -10,37 +10,43 @@ class MyWidget(QWidget):
 
         root_layout = QVBoxLayout()
 
-        # TOP GROUP BEGINNING
+        # TOP BEGINNING
         top_group = QGroupBox()
-        top_group_layout = QHBoxLayout()
+        top_group_layout = QVBoxLayout()
 
-        device_chooser_label = QLabel('Device to Upload too:')
-        device_chooser = QComboBox()
-        device_chooser.addItems(['Deauther', 'Camera Dectector'])
-        file_chooser_label = QLabel('Choose File To Upload:')
-        file_chooser_button = QPushButton('Browse')
-        upload_button_label = QLabel('Upload File:')
-        upload_button = QPushButton('Upload')
-
-        top_group_layout.addWidget(device_chooser_label)
-        top_group_layout.addWidget(device_chooser)
-        top_group_layout.addWidget(file_chooser_label)
-        top_group_layout.addWidget(file_chooser_button)
-        top_group_layout.addWidget(upload_button_label)
-        top_group_layout.addWidget(upload_button)
-        
+        detected_devices = QLabel('ESP Devices Detected:')
+        device_list = QTextEdit()
+   
+        top_group_layout.addWidget(detected_devices)
+        top_group_layout.addWidget(device_list)
+      
         top_group.setLayout(top_group_layout)
-        # TOP GROUP END
+   
+        # TOP END
 
         # MIDDLE LEFT GROUP BEGINNING
         middle_left_group = QGroupBox()
         middle_left_group_layout = QVBoxLayout()
 
-        device_list = QTextEdit()
-   
-        middle_left_group_layout.addWidget(device_list)
-      
+        device_chooser_label = QLabel('Choose Device:')
+        self.device_chooser = QComboBox()
+        self.device_chooser.addItems(['Deauther', 'Camera Detector'])
+        self.device_chooser.activated.connect(self.set_file_chooser_label)
+        self.file_chooser_label = QLabel()
+        file_chooser_button = QPushButton('Browse')
+        file_chooser_button.clicked.connect(self.open_file_browser)
+        self.upload_button_label = QLabel()
+        upload_button = QPushButton('Upload')
+        
+        middle_left_group_layout.addWidget(device_chooser_label)
+        middle_left_group_layout.addWidget(self.device_chooser)
+        middle_left_group_layout.addWidget(self.file_chooser_label)
+        middle_left_group_layout.addWidget(file_chooser_button)
+        middle_left_group_layout.addWidget(self.upload_button_label)
+        middle_left_group_layout.addWidget(upload_button)
+        
         middle_left_group.setLayout(middle_left_group_layout)
+      
         # MIDDLE LEFT GROUP END
 
         # MIDDLE RIGHT GROUP BEGINNING
@@ -57,13 +63,12 @@ class MyWidget(QWidget):
         # MIDDLE RIGHT GROUP END
 
         # MIDDLE GROUPS BEGINNING
-        middle_groups = QGroupBox()
+     
         middle_groups_layout = QHBoxLayout()
 
         middle_groups_layout.addWidget(middle_left_group)
         middle_groups_layout.addWidget(middle_right_group)
 
-        middle_groups.setLayout(middle_groups_layout)
         # MIDDLE GROUPS END
 
         # BOTTOM GROUP BEGINNING
@@ -80,21 +85,32 @@ class MyWidget(QWidget):
         # BOTTOM GROUP END
    
         root_layout.addWidget(top_group)
-        root_layout.addWidget(middle_groups)
+        root_layout.addLayout(middle_groups_layout)
         root_layout.addWidget(bottom_group)
 
         self.setLayout(root_layout)
 
+    def set_file_chooser_label(self):
+        text_file = ''
+        if self.device_chooser.currentText() == 'Deauther':
+            text_file = 'deauther_settings.txt'
+        elif self.device_chooser.currentText() == 'Camera Detector':
+            text_file = 'macs.txt'
 
+        self.file_chooser_label.setText(f'Browse to {text_file}')
+ 
+    def open_file_browser(self):
+        file_browser = QFileDialog()
+        file_browser.setFileMode(QFileDialog.ExistingFiles)
+        file_browser.setNameFilter("Text Files (*.txt)")
+        file_browser.setViewMode(QFileDialog.Detail)
+        # file_paths, _ = file_browser.getOpenFileNames()
+        if file_browser.exec():
+            fileNames = file_browser.selectedFiles()
+            self.upload_button_label.setText(str(fileNames))
 
-        
-
-        
-   
-
-
-       
-
+    
+    
     # @QtCore.Slot()
     # def magic(self):
     #     self.text.setText(random.choice(self.hello))
@@ -105,5 +121,4 @@ if __name__ == "__main__":
     widget = MyWidget()
     widget.resize(800, 600)
     widget.show()
-
     sys.exit(app.exec())
